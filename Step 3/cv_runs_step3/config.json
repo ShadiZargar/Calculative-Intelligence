@@ -1,0 +1,21 @@
+{
+  "features_path": "/Users/shadizargarzadeh/Desktop/ci final proj/Step 3/balanced_features_pca.tsv",
+  "label_col": "label",
+  "drop_cols": [
+    "#Drug",
+    "Gene",
+    "label"
+  ],
+  "k": 5,
+  "epochs": 50,
+  "batch_size": 32,
+  "patience": 5,
+  "lr": 0.001,
+  "dropout": 0.2,
+  "hidden_layers": [
+    256,
+    128
+  ],
+  "seed": 42,
+  "out_dir": "cv_runs_step3"
+}
