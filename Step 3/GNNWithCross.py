@@ -22,9 +22,7 @@ from torch_geometric.data import Data
 from torch_geometric.nn import GCNConv
 from torch_geometric.transforms import RandomLinkSplit
 
-# ----------------------------
-# Model
-# ----------------------------
+
 class GCNEncoder(nn.Module):
     def __init__(self, in_dim: int, hidden: int, out_dim: int, dropout: float):
         super().__init__()
@@ -51,9 +49,6 @@ class LinkPredictor(nn.Module):
     def forward(self, src, dst):
         return self.mlp(torch.cat([src, dst], dim=-1)).view(-1)
 
-# ----------------------------
-# Data loading
-# ----------------------------
 def load_graph_from_pairs(pairs_tsv: Path, is_undirected: bool, one_hot_cap: int = 128) -> Data:
     """
     Expected TSV columns:
@@ -68,11 +63,10 @@ def load_graph_from_pairs(pairs_tsv: Path, is_undirected: bool, one_hot_cap: int
     else:
         pos_df = df.copy()
 
-    # Build node index mapping
     all_nodes = pd.unique(pd.concat([pos_df["#Drug"].astype(str), pos_df["Gene"].astype(str)], ignore_index=True))
     id2idx = {nid: i for i, nid in enumerate(all_nodes)}
 
-    # Edges
+
     src = torch.tensor([id2idx[str(x)] for x in pos_df["#Drug"]], dtype=torch.long)
     dst = torch.tensor([id2idx[str(x)] for x in pos_df["Gene"]], dtype=torch.long)
     edge_index = torch.stack([src, dst], dim=0)
@@ -81,7 +75,6 @@ def load_graph_from_pairs(pairs_tsv: Path, is_undirected: bool, one_hot_cap: int
 
     num_nodes = len(all_nodes)
 
-    # Node features: truncated one-hot + degree
     deg = torch.bincount(edge_index.view(-1), minlength=num_nodes).float().view(-1, 1)
     eye_dim = min(num_nodes, one_hot_cap)
     x_eye = torch.eye(num_nodes)[:, :eye_dim]
@@ -91,9 +84,6 @@ def load_graph_from_pairs(pairs_tsv: Path, is_undirected: bool, one_hot_cap: int
     data._node_id_list = list(all_nodes)
     return data
 
-# ----------------------------
-# Train / Eval
-# ----------------------------
 @torch.no_grad()
 def evaluate(encoder, predictor, data, device, threshold: float = 0.5) -> Dict[str, float]:
     encoder.eval(); predictor.eval()
@@ -174,9 +164,7 @@ def train_one_split(data: Data,
     val_metrics = evaluate(encoder, predictor, val_data, device)
     return val_metrics, test_metrics
 
-# ----------------------------
-# Cross-Validation (Repeated random splits)
-# ----------------------------
+
 def run_cv(pairs_path: Path,
            k: int,
            hidden: int,
@@ -200,7 +188,7 @@ def run_cv(pairs_path: Path,
 
     fold_rows = []
     for fold in range(1, k + 1):
-        # Change RNG state each fold for a different RandomLinkSplit
+      
         torch.manual_seed(seed + fold)
         np.random.seed(seed + fold)
 
@@ -222,7 +210,7 @@ def run_cv(pairs_path: Path,
 
     df = pd.DataFrame(fold_rows).set_index("fold")
 
-    # Summary over test_* metrics
+
     test_cols = [c for c in df.columns if c.startswith("test_")]
     summary = df[test_cols].agg(["mean", "std"]).T
 
@@ -230,15 +218,13 @@ def run_cv(pairs_path: Path,
     df.to_csv(out_dir / "fold_metrics.csv")
     summary.to_csv(out_dir / "summary_metrics.csv")
 
-    # Concise terminal output
     def get(col): return summary.loc[col, "mean"]
     print(f"test_accuracy => {get('test_accuracy'):.4f}")
     print(f"test_precision => {get('test_precision'):.4f}")
     print(f"test_recall => {get('test_recall'):.4f}")
     print(f"test_f1 => {get('test_f1'):.4f}")
     print(f"test_roc_auc => {get('test_roc_auc'):.4f}")
-    # (Optional) AUPRC:
-    # print(f\"test_auprc => {get('test_auprc'):.4f}\")
+
 
 def main():
     ap = argparse.ArgumentParser(description="GNN (GCN) link prediction with cross-validation (repeated random splits)")

@@ -1,5 +1,4 @@
 
-# train_svm.py (enhanced with log file)
 import argparse
 from pathlib import Path
 import numpy as np
@@ -33,7 +32,7 @@ def main():
     ap.add_argument("--log-file", default="svm_train_info.json")
     args = ap.parse_args()
 
-    # --- read data ---
+
     df = pd.read_csv(Path(args.in_path), sep="\t")
     if "label" not in df.columns:
         raise SystemExit("[ERROR] input must contain 'label' (0/1).")
@@ -43,7 +42,6 @@ def main():
     X = df[feat_cols].values
     y = df["label"].astype(int).values
 
-    # --- split ---
     Xtr, Xte, ytr, yte = train_test_split(
         X, y,
         test_size=args.test_size,
@@ -52,8 +50,6 @@ def main():
     )
     print(f"[INFO] Train size = {Xtr.shape[0]}, Test size = {Xte.shape[0]}")
 
-
-    # ذخیره مجموعه آموزش و تست در فایل جدا
     train_out = "train_split.tsv"
     test_out  = "test_split.tsv"
 
@@ -69,8 +65,6 @@ def main():
     print(f"[OK] Saved test  split → {test_out}  | shape={df_test.shape}")
 
 
-
-    # --- model ---
     svm_pipe = Pipeline([
         ("scaler", StandardScaler()),
         ("clf", SVC(kernel="rbf", C=1.0, gamma="scale",
@@ -80,7 +74,6 @@ def main():
     ])
     svm_pipe.fit(Xtr, ytr)
 
-    # --- predict & metrics ---
     y_prob = svm_pipe.predict_proba(Xte)[:, 1]
     y_pred = (y_prob >= 0.5).astype(int)
 
@@ -95,11 +88,9 @@ def main():
     print("Confusion matrix:\n", cm)
     print("Classification report:\n", classification_report(yte, y_pred, digits=4))
 
-    # --- save model ---
     joblib.dump(svm_pipe, args.save_model)
     print(f"[OK] Saved model → {args.save_model}")
 
-    # --- save log file ---
     log_data = {
         "input_file": str(args.in_path),
         "train_size": int(Xtr.shape[0]),

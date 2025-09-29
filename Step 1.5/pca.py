@@ -1,5 +1,3 @@
-# reduce_dim.py
-# ساده: انتخاب ستون‌های z* ، استانداردسازی، PCA، ذخیره خروجی و مدل
 
 import argparse
 from pathlib import Path
@@ -12,10 +10,10 @@ import joblib
 
 def pick_feature_cols(df, prefix="z"):
     cols = [c for c in df.columns if c.startswith(prefix)]
-    # مرتب‌سازی عددی: z0,z1,...
+
     cols = sorted(cols, key=lambda x: int(''.join(ch for ch in x if ch.isdigit()) or 0))
     if not cols:
-        # اگر z* نبود، هر ستون عددی به‌جز متادیتا را بگیر
+        
         exclude = {"node","drug","gene","label","#Drug","Gene"}
         cols = [c for c in df.select_dtypes(include=[np.number]).columns if c not in exclude]
     return cols
@@ -42,11 +40,11 @@ def main():
         raise SystemExit("[ERROR] No feature columns found (z*). Use --prefix or check file.")
     X = df[feat_cols].values
 
-    # Pipeline: Standardize -> PCA
+   
     if args.n_components is not None:
         pca = PCA(n_components=args.n_components, random_state=42)
     else:
-        # نگه داشتن درصد واریانس
+        
         pca = PCA(n_components=args.var, svd_solver="full", random_state=42)
 
     pipe = Pipeline([
@@ -57,9 +55,9 @@ def main():
     evr = pipe.named_steps["pca"].explained_variance_ratio_.sum()
     k = Z.shape[1]
 
-    # بساز خروجی
+    
     out_df = pd.DataFrame(Z, columns=[f"p{i}" for i in range(k)])
-    # متادیتا را اگر هست حفظ کن
+    
     meta = [c for c in ["node","drug","#Drug","gene","Gene","label"] if c in df.columns]
     for c in meta[::-1]:
         out_df.insert(0, c, df[c])

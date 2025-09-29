@@ -1,4 +1,4 @@
-# node2vec_minimal.py
+
 import argparse
 from pathlib import Path
 import random
@@ -19,7 +19,7 @@ def random_walk(G, start, walk_length, rng):
         walk.append(rng.choice(nbrs))
     return walk
 
-def generate_walks(G, num_walks=10, walk_length=5, seed=42):  # ← تغییر به 5
+def generate_walks(G, num_walks=10, walk_length=5, seed=42):  
     rng = random.Random(seed)
     nodes = list(G.nodes())
     walks = []
@@ -27,14 +27,14 @@ def generate_walks(G, num_walks=10, walk_length=5, seed=42):  # ← تغییر �
         rng.shuffle(nodes)
         for n in nodes:
             w = random_walk(G, n, walk_length, rng)
-            # به صورت str برای gensim
+            
             walks.append([str(x) for x in w])
     return walks
 
-# ---------- Load bipartite graph ----------
+
 def load_bipartite_graph(tsv_path: Path) -> nx.Graph:
     df = pd.read_csv(tsv_path, sep="\t")
-    # normalization of column names
+
     cols = {c.strip().replace("#","").lower(): c for c in df.columns}
     drug_col = cols.get("drug", "#Drug")
     gene_col = cols.get("gene", "Gene")
@@ -48,7 +48,7 @@ def load_bipartite_graph(tsv_path: Path) -> nx.Graph:
     G.add_edges_from(df.itertuples(index=False, name=None))
     return G
 
-# ---------- Train embeddings ----------
+
 def train_embeddings(walks, dimensions=128, window=10, min_count=1, workers=4, epochs=5, sg=1, seed=42):
     model = Word2Vec(
         sentences=walks,
@@ -56,7 +56,7 @@ def train_embeddings(walks, dimensions=128, window=10, min_count=1, workers=4, e
         window=window,
         min_count=min_count,
         workers=workers,
-        sg=sg,             # skip-gram
+        sg=sg,            
         negative=5,
         epochs=epochs,
         seed=seed

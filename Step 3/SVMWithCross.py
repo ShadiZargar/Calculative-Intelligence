@@ -1,4 +1,4 @@
-# train_svm_cv.py
+
 import argparse
 from pathlib import Path
 import numpy as np
@@ -26,7 +26,6 @@ def main():
     ap.add_argument("--log-file", default="svm_cv_info.json")
     args = ap.parse_args()
 
-    # --- read data ---
     df = pd.read_csv(Path(args.in_path), sep="\t")
     if "label" not in df.columns:
         raise SystemExit("[ERROR] input must contain 'label' (0/1).")
@@ -36,7 +35,7 @@ def main():
     X = df[feat_cols].values
     y = df["label"].astype(int).values
 
-    # --- define pipeline ---
+
     svm_pipe = Pipeline([
         ("scaler", StandardScaler()),
         ("clf", SVC(
@@ -49,7 +48,6 @@ def main():
         ))
     ])
 
-    # --- cross validation ---
     cv = StratifiedKFold(n_splits=args.folds, shuffle=True, random_state=args.seed)
     scores = cross_validate(
         svm_pipe, X, y, cv=cv,
@@ -57,7 +55,6 @@ def main():
         return_train_score=False
     )
 
-    # --- print results ---
     print("\n=== SVM (RBF) with Cross Validation ===")
     for metric in scores:
         if metric.startswith("test_"):
@@ -65,7 +62,6 @@ def main():
             std  = scores[metric].std()
             print(f"{metric} => {mean:.4f} +/- {std:.4f}")
 
-    # --- save log ---
     log_data = {m: {"mean": float(scores[m].mean()), "std": float(scores[m].std())}
                 for m in scores if m.startswith("test_")}
     with open(args.log_file, "w") as f:

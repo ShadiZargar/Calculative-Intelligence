@@ -1,5 +1,4 @@
-# build_features_from_pairs.py
-# Join balanced pairs with node embeddings → pair-wise features (concat)
+
 import argparse
 from pathlib import Path
 import pandas as pd
@@ -41,7 +40,7 @@ def main():
     if not pairs_path.exists(): raise SystemExit(f"[ERROR] Not found: {pairs_path.resolve()}")
     if not emb_path.exists():   raise SystemExit(f"[ERROR] Not found: {emb_path.resolve()}")
 
-    # --- read inputs ---
+  
     df_pairs = pd.read_csv(pairs_path, sep="\t")
     df_pairs.columns = [c.strip() for c in df_pairs.columns]
     df_emb   = pd.read_csv(emb_path, sep="\t")
@@ -50,7 +49,7 @@ def main():
     print(f"[INFO] pairs shape: {df_pairs.shape} | cols: {list(df_pairs.columns)[:6]}")
     print(f"[INFO] emb   shape: {df_emb.shape}   | cols: {list(df_emb.columns)[:6]}")
 
-    # --- column checks ---
+
     drug_col = "#Drug" if "#Drug" in df_pairs.columns else ("drug" if "drug" in df_pairs.columns else None)
     gene_col = "Gene"  if "Gene"  in df_pairs.columns else ("gene" if "gene" in df_pairs.columns else None)
     if drug_col is None or gene_col is None:
@@ -65,16 +64,15 @@ def main():
         raise SystemExit("[ERROR] No embedding feature columns found (prefix p/z/e/fp/f).")
     print(f"[INFO] using {len(feat_cols)} embedding cols; first 5: {feat_cols[:5]}")
 
-    # map node -> vector
+    
     E = df_emb.set_index("node")[feat_cols]
 
-    # join for drug
+
     left = df_pairs.join(E, on=drug_col, how="inner", rsuffix="_D")
     dcols = [f"d_{i}" for i in range(len(feat_cols))]
     left.columns = list(left.columns[:3]) + dcols
     print(f"[INFO] after join(drug) : {left.shape}")
 
-    # join for gene
     full = left.join(E, on=gene_col, how="inner", rsuffix="_G")
     gcols = [f"g_{i}" for i in range(len(feat_cols))]
     full.columns = list(left.columns) + gcols
@@ -83,7 +81,6 @@ def main():
     if full.empty:
         raise SystemExit("[ERROR] After join, no rows left. Check that 'node' IDs match #Drug/Gene values.")
 
-    # build pair features: concat(drug_emb, gene_emb)
     X = np.hstack([full[dcols].values, full[gcols].values])
     feat_out_cols = [f"f{i}" for i in range(X.shape[1])]
     out = pd.DataFrame(X, columns=feat_out_cols)

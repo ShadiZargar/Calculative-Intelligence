@@ -11,14 +11,14 @@ from rdkit.Chem import AllChem
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler, normalize
 
-# -------------------- Config --------------------
-EDGES_TSV       = Path("ChG-Miner_miner-chem-gene.tsv")   # edge list: #Drug, Gene
-MERGED_TSV      = Path("drug_gene_with_smiles.tsv")       # includes #Drug, SMILES (NaN allowed)
 
-OUT_EMB         = Path("emb_deepwalk.tsv")                # graph embeddings (e0..e{DIMS-1})
-OUT_FP          = Path("drug_fp.tsv")                     # drug fingerprints (fp0..fp2047)
-OUT_FUSED_SUM   = Path("emb_fused_sum.tsv")               # fused (sum)  -> z0..z{DIMS-1}
-OUT_FUSED_CAT   = Path("emb_fused_cat.tsv")               # fused (concat) -> z0..z{2*DIMS-1}
+EDGES_TSV       = Path("ChG-Miner_miner-chem-gene.tsv") 
+MERGED_TSV      = Path("drug_gene_with_smiles.tsv")       
+
+OUT_EMB         = Path("emb_deepwalk.tsv")                
+OUT_FP          = Path("drug_fp.tsv")                  
+OUT_FUSED_SUM   = Path("emb_fused_sum.tsv")             
+OUT_FUSED_CAT   = Path("emb_fused_cat.tsv")            
 
 # DeepWalk / Word2Vec
 DIMS_GRAPH   = 128
@@ -31,23 +31,20 @@ MIN_COUNT    = 1
 
 # Fingerprint
 FP_BITS      = 2048
-FP_RADIUS    = 2               # ECFP4
+FP_RADIUS    = 2              
 
 # Fusion
-ALPHA        = 0.7             # weight for graph in weighted-sum
+ALPHA        = 0.7            
 
-# Reproducibility
+
 GLOBAL_SEED  = 42
 np.random.seed(GLOBAL_SEED)
 random.seed(GLOBAL_SEED)
 
-# Silence RDKit + some warnings
 RDLogger.DisableLog('rdApp.*')
 warnings.filterwarnings("ignore", category=FutureWarning)
-# ------------------------------------------------
 
 
-# ----------------- Graph & DeepWalk -----------------
 def load_edges(tsv_path: Path):
     if not tsv_path.exists():
         raise SystemExit(f"[ERROR] File not found: {tsv_path}")
@@ -81,7 +78,7 @@ def generate_walks(G: nx.Graph, walk_length=5, num_walks=10, seed=42):
         rng.shuffle(nodes)
         for n in nodes:
             w = _random_walk(G, n, walk_length, rng)
-            walks.append([str(x) for x in w])  # gensim needs str tokens
+            walks.append([str(x) for x in w]) 
     return walks
 
 def train_deepwalk_embeddings(G: nx.Graph) -> pd.DataFrame:
@@ -92,12 +89,12 @@ def train_deepwalk_embeddings(G: nx.Graph) -> pd.DataFrame:
         window=WINDOW,
         min_count=MIN_COUNT,
         workers=WORKERS,
-        sg=1,            # skip-gram
+        sg=1,          
         negative=5,
         epochs=EPOCHS,
         seed=GLOBAL_SEED
     )
-    # to DataFrame with e0..e{DIMS-1}
+   
     nodes = list(G.nodes())
     vecs = []
     for n in nodes:
@@ -110,7 +107,6 @@ def train_deepwalk_embeddings(G: nx.Graph) -> pd.DataFrame:
     emb.insert(0, "node", nodes)
     return emb
 
-# ----------------- SMILES → FP -----------------
 def load_merged_smiles(tsv_path: Path, drug_col: str):
     if not tsv_path.exists():
         raise SystemExit(f"[ERROR] File not found: {tsv_path}")
@@ -148,7 +144,7 @@ def build_fp_table(df_sm: pd.DataFrame, drug_col: str, fp_bits=2048, radius=2) -
         s = row["SMILES"]
         arr = smiles_to_fp(s, nBits=fp_bits, radius=radius)
         if arr is None:
-            arr = np.zeros((fp_bits,), dtype=np.float32)  # treat invalid/missing as zeros
+            arr = np.zeros((fp_bits,), dtype=np.float32) 
         rows.append((dbid, arr))
     fp_mat = np.vstack([r[1] for r in rows])
     ids = [r[0] for r in rows]
@@ -156,7 +152,7 @@ def build_fp_table(df_sm: pd.DataFrame, drug_col: str, fp_bits=2048, radius=2) -
     df_fp.insert(0, "node", ids)
     return df_fp
 
-# ----------------- Fusion -----------------
+
 def fuse_embeddings(emb_graph: pd.DataFrame, df_fp: pd.DataFrame,
                     alpha=0.7, dims_graph=128,
                     out_sum=OUT_FUSED_SUM, out_cat=OUT_FUSED_CAT):
@@ -172,16 +168,14 @@ def fuse_embeddings(emb_graph: pd.DataFrame, df_fp: pd.DataFrame,
     Xg  = df_all[vec_cols_graph].values
     Xfp = df_all[vec_cols_fp].fillna(0.0).values if vec_cols_fp else np.zeros((len(df_all), FP_BITS), dtype=np.float32)
 
-    # align FP dim to graph dim with PCA
     Xfp_std = StandardScaler(with_mean=True, with_std=True).fit_transform(Xfp)
     pca = PCA(n_components=dims_graph, random_state=GLOBAL_SEED)
     Xfp_pca = pca.fit_transform(Xfp_std)
 
-    # fusion
+
     X_sum = alpha * Xg + (1 - alpha) * Xfp_pca
     X_cat = np.hstack([Xg, Xfp_pca])
 
-    # normalize
     X_sum = normalize(X_sum)
     X_cat = normalize(X_cat)
 
@@ -196,7 +190,6 @@ def fuse_embeddings(emb_graph: pd.DataFrame, df_fp: pd.DataFrame,
     return out_sum_df, out_cat_df
 
 
-# ----------------- main -----------------
 def main():
     print("[1/4] Loading edges and building graph …")
     df_edges, drug_col, gene_col = load_edges(EDGES_TSV)

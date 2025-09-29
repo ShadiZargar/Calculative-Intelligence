@@ -1,12 +1,3 @@
-# make_balanced_dataset.py
-# ساخت دیتاست بالانس‌شده برای آموزش (positive/negative pairs)
-# - ورودی: edge list مثبت (#Drug, Gene)
-# - تولید: منفی‌ها به نسبت مشخص
-# - (اختیاری) الحاق امبدینگ‌ها و ساخت فیچر جفت (concat)
-#
-# خروجی‌ها:
-#  1) balanced_pairs.tsv      -> drug, gene, label
-#  2) balanced_features.tsv   -> drug, gene, label, f0..f{2*dims-1} (اگر emb_final.tsv بدهی)
 
 import argparse
 from pathlib import Path
@@ -40,13 +31,13 @@ def sample_negatives(drugs, genes, pos_pairs_set, n_neg, seed=42, max_trials=50_
     return list(neg)
 
 def build_feature_table(pairs_df: pd.DataFrame, emb_df: pd.DataFrame, drug_col: str, gene_col: str):
-    # emb_df: node + z0..zK
+ 
     z_cols = [c for c in emb_df.columns if c != "node"]
     dims = len(z_cols)
-    # join drug embeddings
+
     d_map = emb_df.set_index("node")[z_cols]
-    g_map = d_map  # same table, nodes mixed drug/gene
-    # align (inner joins to keep only pairs that have both embeddings)
+    g_map = d_map
+
     left = pairs_df.join(d_map, on=drug_col, how="inner", rsuffix="_D")
     left.columns = list(left.columns[:3]) + [f"d_{i}" for i in range(dims)]
     full = left.join(g_map, on=gene_col, how="inner", rsuffix="_G")
@@ -55,7 +46,7 @@ def build_feature_table(pairs_df: pd.DataFrame, emb_df: pd.DataFrame, drug_col: 
         print("[WARN] No overlapping embeddings for pairs; features table will be empty.")
         return full
 
-    # concatenate [drug_emb || gene_emb]
+
     d_cols = [f"d_{i}" for i in range(dims)]
     g_cols = [f"g_{i}" for i in range(dims)]
     Xd = full[d_cols].values
@@ -84,7 +75,7 @@ def main():
     out_pairs  = Path(args.out_pairs)
     out_feats  = Path(args.out_feats)
 
-    # 1) load positives
+
     df_pos, drug_col, gene_col = read_edges(edges_path)
     n_pos = len(df_pos)
     drugs = df_pos[drug_col].unique()
@@ -93,31 +84,31 @@ def main():
 
     print(f"[INFO] Drugs={len(drugs)}, Genes={len(genes)}, Positives={n_pos}")
 
-    # 2) sample negatives
+
     n_neg_target = int(round(args.neg_ratio * n_pos))
     print(f"[INFO] Sampling negatives: {n_neg_target} (ratio={args.neg_ratio}) …")
     neg_pairs = sample_negatives(drugs, genes, pos_set, n_neg_target, seed=args.seed)
     df_neg = pd.DataFrame(neg_pairs, columns=[drug_col, gene_col])
     df_neg["label"] = 0
 
-    # 3) build pairs table
+
     df_pos_lab = df_pos.copy()
     df_pos_lab["label"] = 1
     pairs = pd.concat([df_pos_lab, df_neg], axis=0, ignore_index=True)
-    pairs = pairs.sample(frac=1.0, random_state=args.seed).reset_index(drop=True)  # shuffle
+    pairs = pairs.sample(frac=1.0, random_state=args.seed).reset_index(drop=True)  
     pairs.to_csv(out_pairs, sep="\t", index=False)
     print(f"[OK] Saved pairs → {out_pairs} | shape={pairs.shape} | pos={n_pos}, neg={len(df_neg)}")
 
-    # 4) (optional) join embeddings to build features
+   
     if emb_path.exists():
         emb = pd.read_csv(emb_path, sep="\t")
         emb.columns = [c.strip() for c in emb.columns]
         if "node" not in emb.columns:
             print("[WARN] 'emb_final.tsv' has no 'node' column; skip features.")
             return
-        # rename emb columns to z*
+
         z_cols = [c for c in emb.columns if c != "node"]
-        # ensure numeric
+
         emb[z_cols] = emb[z_cols].apply(pd.to_numeric, errors="coerce")
         feats = build_feature_table(pairs, emb, drug_col, gene_col)
         if len(feats):

@@ -8,17 +8,14 @@ from torch_geometric.data import Data
 from torch_geometric.nn import GCNConv
 from torch_geometric.transforms import RandomLinkSplit
 
-# ======== تنظیمات ساده ========
 PAIRS_TSV = os.path.join(os.path.dirname(__file__), "balanced_pairs.tsv")
 HIDDEN = 128
 EPOCHS = 100
 LR = 1e-3
 WEIGHT_DECAY = 1e-4
 DROPOUT = 0.3
-# اگر گراف رو بدون جهت می‌دونی، True بذار
 IS_UNDIRECTED = True
 
-# ======== مدل‌ها ========
 class GCNEncoder(torch.nn.Module):
     def __init__(self, in_dim, hidden, out_dim):
         super().__init__()
@@ -44,23 +41,18 @@ class LinkPredictor(nn.Module):
     def forward(self, src, dst):
         return self.mlp(torch.cat([src, dst], dim=-1)).view(-1)
 
-# ======== داده را بساز ========
 def load_graph_from_pairs(pairs_tsv):
     df = pd.read_csv(pairs_tsv, sep="\t")
-    # اگر ستون label داری، فقط مثبت‌ها را برای ساخت گراف نگه دار
     if "label" in df.columns:
         pos_df = df[df["label"] == 1].copy()
     else:
         pos_df = df.copy()
 
-    # نگاشت شناسه‌های دارو/ژن به ایندکس گره
-    # سادگی: یک فضا برای همهٔ نودها می‌سازیم (دارو+ژن)
-    # id را تبدیل به str می‌کنیم تا برخورد پیش نیاد
     all_nodes = pd.unique(pd.concat([pos_df["#Drug"].astype(str),
                                      pos_df["Gene"].astype(str)], ignore_index=True))
     id2idx = {nid: i for i, nid in enumerate(all_nodes)}
 
-    # edge_index
+  
     src = torch.tensor([id2idx[str(x)] for x in pos_df["#Drug"]], dtype=torch.long)
     dst = torch.tensor([id2idx[str(x)] for x in pos_df["Gene"]], dtype=torch.long)
     edge_index = torch.stack([src, dst], dim=0)
@@ -69,17 +61,15 @@ def load_graph_from_pairs(pairs_tsv):
 
     num_nodes = len(all_nodes)
 
-    # ویژگی نودها: اگر ویژگی واقعی نداری، One-hot کم‌حجم + degree
     deg = torch.bincount(edge_index.view(-1), minlength=num_nodes).float().view(-1, 1)
     eye_dim = min(num_nodes, 128)
     x_eye = torch.eye(num_nodes)[:, :eye_dim]
     x = torch.cat([x_eye, deg], dim=1)
 
     data = Data(x=x, edge_index=edge_index)
-    data._node_id_list = list(all_nodes)  # برای نگاشت خروجی به شناسه‌های اصلی
+    data._node_id_list = list(all_nodes)  
     return data
 
-# ======== حلقه‌های آموزش/ارزیابی با RandomLinkSplit ========
 @torch.no_grad()
 def evaluate(encoder, predictor, data, device):
     encoder.eval(); predictor.eval()
@@ -97,12 +87,11 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     data = load_graph_from_pairs(PAIRS_TSV)
 
-    # Split جدید: خودش نگتیوها را می‌سازد و در فیلدهای edge_label(_index) می‌گذارد
     splitter = RandomLinkSplit(
         num_val=0.15, num_test=0.15,
         is_undirected=IS_UNDIRECTED,
-        add_negative_train_samples=True,  # خیلی مهم: برای train هم نگتیو بسازد
-        neg_sampling_ratio=1.0,           # به ازای هر مثبت یک منفی
+        add_negative_train_samples=True,
+        neg_sampling_ratio=1.0,          
     )
     train_data, val_data, test_data = splitter(data)
 
@@ -134,7 +123,6 @@ def main():
         if epoch % 5 == 0:
             print(f"Epoch {epoch:03d} | loss={loss.item():.4f} | val AUPRC={va_pr:.4f} AUROC={va_roc:.4f}")
 
-    # ارزیابی نهایی روی تست
     if best_state is not None:
         encoder.load_state_dict(best_state[0])
         predictor.load_state_dict(best_state[1])
@@ -142,8 +130,6 @@ def main():
     te_roc, te_pr, te_scores = evaluate(encoder, predictor, test_data, device)
     print(f"TEST — AUPRC={te_pr:.4f} | AUROC={te_roc:.4f}")
 
-    # خروجی پیش‌بینی‌های تست
-    # لبه‌های تست شامل مثبت و منفی است؛ ما فقط امتیاز و لیبل را ذخیره می‌کنیم
     nid_list = data._node_id_list
     s, d = test_data.edge_label_index
     s = s.cpu().numpy(); d = d.cpu().numpy()

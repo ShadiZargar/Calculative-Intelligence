@@ -6,12 +6,12 @@ import numpy as np
 import pandas as pd
 from typing import List, Tuple, Dict
 
-# Sklearn
+
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 
-# TensorFlow / Keras
+
 import tensorflow as tf
 from tensorflow.keras import Sequential, Input
 from tensorflow.keras.layers import Dense, Dropout
@@ -25,7 +25,7 @@ def parse_hidden_layers(s: str) -> List[int]:
 def build_mlp(input_dim: int, hidden: List[int], dropout: float, lr: float, seed: int = 42) -> tf.keras.Model:
     tf.keras.utils.set_random_seed(seed)
     model = Sequential()
-    model.add(Input(shape=(input_dim,)))  # Avoid Dense(..., input_shape=...) warnings
+    model.add(Input(shape=(input_dim,)))  
     model.add(Dense(hidden[0], activation="relu"))
     if dropout > 0:
         model.add(Dropout(dropout))
@@ -136,7 +136,6 @@ def run_cv(features_path: Path,
     df_folds = pd.DataFrame(fold_rows).set_index("fold")
     summary = df_folds.agg(["mean", "std"]).T
 
-    # Save outputs (still saved, but no verbose printing)
     df_folds.to_csv(out_dir / "fold_metrics.csv")
     summary.to_csv(out_dir / "summary_metrics.csv")
     pd.DataFrame({"oof_prob": oof_prob, "oof_pred": oof_pred, "y_true": y}).to_csv(out_dir / "oof_predictions.csv", index=False)
@@ -157,7 +156,6 @@ def run_cv(features_path: Path,
     }
     Path(out_dir / "config.json").write_text(json.dumps(cfg, indent=2), encoding="utf-8")
 
-    # Concise terminal output only
     print(f"test_accuracy => {summary.loc['accuracy','mean']:.4f}")
     print(f"test_precision => {summary.loc['precision','mean']:.4f}")
     print(f"test_recall => {summary.loc['recall','mean']:.4f}")
