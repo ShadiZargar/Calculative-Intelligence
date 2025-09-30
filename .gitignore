@@ -1,0 +1,52 @@
+# Virtual environments
+.venv/
+.venv310/
+venv/
+env/
+ENV/
+
+# Conda environments
+.env/
+miniconda3/
+Miniconda3*/
+anaconda3/
+
+# Large data files - add any other large files you don't want to push
+# *.zip
+*.tar.gz
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.model
+
+# IDE and OS files
+.DS_Store
+*.swp
+*.swo
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter
+.ipynb_checkpoints
+
+# Logs
+*.log
